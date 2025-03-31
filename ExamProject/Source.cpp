@@ -2,171 +2,95 @@
 #include <string>
 #include <fstream>
 
-struct Transaction 
-{
-    std::string walletName;
-    std::string category;
-    double amount;
-    int date;
-};
-
-struct Wallet 
-{
+class Wallet {
+private:
     std::string name;
-    std::string type;
     double balance;
+    bool isCredit;
+
+public:
+    Wallet(std::string name, bool isCredit) : name(name), isCredit(isCredit), balance(0) {}
+    
+    void deposit(double amout)
+    {
+        balance += amout;
+        std::cout << name << "Balans popolnen na: $" << amout << ". Vash balans: $" << balance << "\n";
+    }
+
+    bool expenditure(double amout)
+    {
+        if (!isCredit && balance < amout)
+        {
+            std::cout << "Nehvataet sredstv\n";
+            return false;
+        }
+        
+        balance -= amout;
+        std::cout << "Spisano $" << amout << " s " << name << ". Balans: " << balance << "\n";
+        return true;
+    }
+
+    double getBalance() const { return balance; }
+    std::string getName() const { return name; }
 };
 
-const int MAX_WALLETS = 10;
-const int MAX_TRANSACTIONS = 100;
+class Transaction {
+public:
+    std::string category;
+    double amout;
+    std::string date;
 
-Wallet wallets[MAX_WALLETS];
-Transaction transactions[MAX_TRANSACTIONS];
-
-int walletCount = 0;
-int transactionCount = 0;
-
-void addWallet()
-{
-    bool canAddWallet = 0;
-    if (walletCount < MAX_WALLETS)
-    {
-        canAddWallet = 1;
+    Transaction(std::string category, double amount, std::string date)
+        : category(category), amout(amout), date(date) {
     }
-    else
-    {
-        std::cout << "Wallet limit reached!\n";
-    }
+};
 
-    if (canAddWallet)
-    {
-        std::cout << "Enter wallet name: ";
-        std::cin >> wallets[walletCount].name;
-        std::cout << "Enter type (debit/credit): ";
-        std::cin >> wallets[walletCount].type;
-        wallets[walletCount].balance = 0;
-        walletCount++;
-    }
-}
+class FinanceManager {
+private:
+    Wallet* wallets[10];
+    int walletCount;
+    Transaction* transactions[100];
+    int transactionCount;
 
-void deposit()
-{
-    std::string name;
-    double amount;
-    std::cout << "Enter wallet name";
-    std::cin >> name;
-    std::cout << "Enter amount";
-    std::cin >> amount;
-    bool found = false;
-    for (int i = 0; i < walletCount; i++)
+public:
+    FinanceManager() : walletCount(0), transactionCount(0) {}
+    void addWallet(std::string name, bool isCredit)
     {
-        if (wallets[i].name == name)
+        if (walletCount < 10)
         {
-            wallets[i].balance += amount;
-            found = true;
-            break;
+            wallets[walletCount++] = new Wallet(name, isCredit);
+            std::cout << "Dobavlen :" << name << "\n";
+        }
+        else {
+            std::cout << "Max kolichestvo portmane dostignuto\n";
         }
     }
-    if (!found)
-    {
-        std::cout << "Wallet not found!\n";
-    }
-}
-
-void addExpense()
-{
-    if (transactionCount >= MAX_TRANSACTIONS)
-    {
-        std::cout << "Transaction limit reached!\n";
-        return;
-    }
-
-    std::string name, category;
-    double amount;
-    int date;
-    std::cout << "Enter wallet name: ";
-    std::cin >> name;
-    std::cout << "Enter category: ";
-    std::cin >> category;
-    std::cout << "Enter amount: ";
-    std::cin >> amount;
-    std::cout << "Enter date (YYYYMMDD): ";
-    std::cin >> date;
-
-    bool found = false;
-    for (int i = 0; i < walletCount; i++)
-    {
-        if (wallets[i].name == name)
-        {
-            if (wallets[i].balance >= amount)
-            {
-                wallets[i].balance -= amount;
-                transactions[transactionCount++] =
-                { name, category, amount, date };
-                found = true;
-                break;
-            }
-            else
-            {
-                std::cout << "Insufficient funds!\n";
-                return;
-            }
+    Wallet* getWallet(std::string name) {
+        for (int i = 0; i < walletCount; i++) {
+            if (wallets[i]->getName() == name) return wallets[i];
         }
+        std::cout <<"Portmane ne nayden\n";
     }
-    if (!found)
-    {
-        std::cout << "Wallet not found!\n";
-    }
-}
-
-void generateReport(int fromDate)
-{
-    double total = 0;
-    for (int i = 0; i < transactionCount; i++)
-    {
-        if (transactions[i].date >= fromDate)
-        {
-            total += transactions[i].amount;
-            std::cout << transactions[i].walletName << " - " << transactions[i].category << " - $" << transactions[i].amount << "\n";
+    void addTransaction(std::string walletName, std::string category, double amount, std::string date) {
+        Wallet* wallet = getWallet(walletName);
+        if (!wallet) {
+            std::cout << "Portmane ne nayden\n";
+            return;
         }
+        if (!wallet->expenditure(amount)) return;
+        transactions[transactionCount++] = new Transaction(category, amount, date);
     }
-    std::cout << "Total: $" << total << "\n";
-}
-
-void saveReportToFile(int fromDate, std::string filename) {
-    std::ofstream file(filename);
-    double total = 0;
-    for (int i = 0; i < transactionCount; i++) {
-        if (transactions[i].date >= fromDate) {
-            file << transactions[i].walletName << " - " << transactions[i].category << " - $" << transactions[i].amount << "\n";
-            total += transactions[i].amount;
+    void saveReport() {
+        std::ofstream file("finance_report.txt");
+        file << "Tranzakcii:\n";
+        for (int i = 0; i < transactionCount; i++) {
+            file << transactions[i]->date << " - " << transactions[i]->category << ": " << transactions[i]->amout << "\n";
         }
+        file.close();
+        std::cout << "Otchet sohranen\n";
     }
-    file << "Total: $" << total << "\n";
-    file.close();
-}
-
-void topExpenses(int fromDate) {
-    Transaction top[3] = { {"", "", 0, 0}, {"", "", 0, 0}, {"", "", 0, 0} };
-
-    for (int i = 0; i < transactionCount; i++) {
-        if (transactions[i].date >= fromDate) {
-            for (int j = 0; j < 3; j++) {
-                if (transactions[i].amount > top[j].amount) {
-                    for (int k = 2; k > j; k--) {
-                        top[k] = top[k - 1];
-                    }
-                    top[j] = transactions[i];
-                    break;
-                }
-            }
-        }
+    ~FinanceManager() {
+        for (int i = 0; i < walletCount; i++) delete wallets[i];
+        for (int i = 0; i < transactionCount; i++) delete transactions[i];
     }
-
-    std::cout << "Top 3 expenses:\n";
-    for (int i = 0; i < 3; i++) {
-        if (top[i].amount > 0) {
-            std::cout << top[i].category << " - $" << top[i].amount << "\n";
-        }
-    }
-}
+};
